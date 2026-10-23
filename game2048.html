@@ -194,6 +194,27 @@
   }
   .back-home:hover { background: rgba(30,30,30,.8); }
   .back-home:active { transform: translateY(1px); }
+
+  .startmode {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .startmode .lbl { font-size: 13px; color: var(--text-faint); }
+  .startmode button {
+    height: 32px;
+    padding: 0 12px;
+    font-size: 13px;
+  }
+  .startmode button.active {
+    background: #8f7a66;
+    color: #f9f6f2;
+    border-color: transparent;
+    font-weight: 700;
+  }
 </style>
 </head>
 <body>
@@ -207,6 +228,14 @@
     <button id="undoBtn" title="撤销上一步">↶ 撤销</button>
     <div class="box"><div class="label">最高分</div><div class="val" id="best">0</div></div>
     <button id="themeBtn" title="切换亮/暗主题">亮色</button>
+  </div>
+
+  <div class="startmode">
+    <span class="lbl">开局：</span>
+    <button data-start="0" class="active">正常</button>
+    <button data-start="1024">1024+1024</button>
+    <button data-start="2048">2048+2048</button>
+    <button data-start="4096">4096+4096</button>
   </div>
 
   <div class="board" id="board">
@@ -273,6 +302,8 @@
   let bestTime = null;
   let isNewBest = false;
   let audioCtx = null;
+  let startValue = 0;
+  let winTarget = 2048;
 
   // —— 初始化背景格 ——
   function buildBg() {
@@ -363,6 +394,7 @@
         if (snap.grid[r][c]) createTile(snap.grid[r][c], r, c, false);
     updateScore();
     updateUndoState();
+    saveGame();
   }
 
   function targetCoord(dir, lineIdx, k) {
@@ -405,11 +437,11 @@
       if (history.length > 50) history.shift();
       updateUndoState();
       spawnTile();
-      if (!won && hasValue(2048)) {
+      if (!won && hasValue(winTarget)) {
         won = true;
         stopTimer();
         isNewBest = false;
-        if (bestTime == null || seconds < bestTime) {
+        if (winTarget === 2048 && (bestTime == null || seconds < bestTime)) {
           bestTime = seconds;
           isNewBest = true;
           try { localStorage.setItem('best2048_time', bestTime); } catch (e) {}
@@ -421,6 +453,7 @@
         stopTimer();
         setTimeout(() => showOverlay('gameover'), ANIM_MS + 40);
       }
+      saveGame();
     }
   }
 
@@ -465,9 +498,11 @@
   function showOverlay(type) {
     if (type === 'win') {
       ovMsgEl.textContent = '你赢了！';
-      let sub = `达成 2048 · 用时 ${seconds} 秒`;
-      if (isNewBest) sub += ' · 新纪录！';
-      else if (bestTime != null) sub += ` · 最快 ${bestTime} 秒`;
+      let sub = `达成 ${winTarget} · 用时 ${seconds} 秒`;
+      if (winTarget === 2048) {
+        if (isNewBest) sub += ' · 新纪录！';
+        else if (bestTime != null) sub += ` · 最快 ${bestTime} 秒`;
+      }
       ovSubEl.textContent = sub;
       ovPrimaryEl.textContent = '继续挑战';
     } else {
@@ -494,8 +529,15 @@
     stopTimer();
     seconds = 0;
     timerStarted = false;
-    spawnTile();
-    spawnTile();
+    winTarget = startValue > 0 ? startValue * 2 : 2048;
+    if (startValue > 0) {
+      createTile(startValue, 3, 0);
+      createTile(startValue, 3, 1);
+    } else {
+      spawnTile();
+      spawnTile();
+    }
+    saveGame();
   }
 
   // —— 键盘 ——
@@ -525,6 +567,14 @@
 
   newBtn.addEventListener('click', newGame);
   undoBtn.addEventListener('click', undo);
+  document.querySelectorAll('.startmode button').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.startmode button').forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      startValue = +btn.dataset.start;
+      newGame();
+    });
+  });
   ovPrimaryEl.addEventListener('click', () => {
     hideOverlay();
     if (gameOver) newGame();
@@ -598,12 +648,48 @@
     if (timerId) { clearInterval(timerId); timerId = null; }
   }
 
+  // —— 存档（localStorage 保存进行中的游戏） ——
+  function saveGame() {
+    try {
+      if (gameOver) {
+        localStorage.removeItem('save2048');
+      } else {
+        const g = [];
+        for (let r = 0; r < 4; r++) { g[r] = []; for (let c = 0; c < 4; c++) g[r][c] = grid[r][c] ? grid[r][c].value : 0; }
+        localStorage.setItem('save2048', JSON.stringify({ grid: g, score, won, history, seconds, timerRunning: timerId != null }));
+      }
+    } catch (e) {}
+  }
+  function loadGame() {
+    let data;
+    try { data = JSON.parse(localStorage.getItem('save2048') || 'null'); } catch (e) { data = null; }
+    if (!data || !Array.isArray(data.grid)) return false;
+    grid = Array.from({ length: 4 }, () => Array(4).fill(null));
+    tileContainer.innerHTML = '';
+    for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) {
+      const v = data.grid[r][c];
+      if (v > 0) createTile(v, r, c, false);
+    }
+    score = data.score || 0;
+    won = !!data.won;
+    gameOver = false;
+    history = Array.isArray(data.history) ? data.history : [];
+    seconds = data.seconds || 0;
+    scoreEl.textContent = score;
+    hideOverlay();
+    updateUndoState();
+    if (data.timerRunning) startTimer();
+    return true;
+  }
+
   // —— 启动 ——
   buildBg();
   best = (() => { try { return +localStorage.getItem('best2048') || 0; } catch (e) { return 0; } })();
   bestEl.textContent = best;
   bestTime = (() => { try { const v = +localStorage.getItem('best2048_time'); return v > 0 ? v : null; } catch (e) { return null; } })();
-  newGame();
+  if (!loadGame()) newGame();
+  window.addEventListener('beforeunload', saveGame);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveGame(); });
 })();
 </script>
 </body>

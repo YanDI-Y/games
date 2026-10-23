@@ -560,6 +560,7 @@
     renderBoard();
     updateBestDisplay();
     fitToWidth();
+    saveGame();
   }
 
   function renderBoard() {
@@ -869,6 +870,7 @@
     if (cell.revealed || cell.flagged) return;
     pushHistory();
     revealCore(r, c);
+    saveGame();
   }
 
   function revealCore(r, c, silent) {
@@ -920,6 +922,7 @@
     cellAt(r, c).classList.toggle('flag', cell.flagged);
     updateMineCounter();
     playFlag();
+    saveGame();
   }
 
   function chord(r, c) {
@@ -936,6 +939,7 @@
     forEachNeighbor(r, c, (nr, nc) => {
       if (!grid[nr][nc].revealed && !grid[nr][nc].flagged) revealCore(nr, nc, true);
     });
+    saveGame();
   }
 
   function lose(r, c) {
@@ -1412,6 +1416,46 @@
     msgEl.style.color = '#ffd479';
     hideFailOverlay();
     if (!gameOver && !firstClick) startTimer();
+    saveGame();
+  }
+
+  // —— 存档（localStorage 保存进行中的游戏） ——
+  function saveGame() {
+    try {
+      if (gameOver) {
+        localStorage.removeItem('minesweeper_save');
+      } else {
+        const rawLevel = document.querySelector('.difficulty button.active').dataset.level;
+        localStorage.setItem('minesweeper_save', JSON.stringify({ level: rawLevel, customCfg: customCfg, state: snapshotState() }));
+      }
+    } catch (e) {}
+  }
+  function loadGame() {
+    let data;
+    try { data = JSON.parse(localStorage.getItem('minesweeper_save') || 'null'); } catch (e) { data = null; }
+    if (!data || !data.state || !Array.isArray(data.state.grid)) return false;
+    customCfg = data.customCfg || null;
+    document.querySelectorAll('.difficulty button[data-level]').forEach(b => b.classList.remove('active'));
+    const btn = data.level === 'custom' ? customBtn : document.querySelector('.difficulty button[data-level="' + data.level + '"]');
+    if (btn) btn.classList.add('active');
+    newGame(data.level);
+    const s = data.state;
+    grid = s.grid.map(row => row.map(c => ({ mine: c.mine, revealed: c.revealed, flagged: c.flagged, adjacent: c.adjacent })));
+    flagCount = s.flagCount;
+    revealedCount = s.revealedCount;
+    gameOver = s.gameOver;
+    firstClick = s.firstClick;
+    seconds = s.seconds;
+    hintCount = s.hintCount;
+    syncBoard();
+    updateMineCounter();
+    timerEl.textContent = String(Math.min(999, seconds)).padStart(3, '0');
+    resetBtn.textContent = '😊';
+    msgEl.textContent = '';
+    msgEl.style.color = '#ffd479';
+    if (!gameOver && !firstClick) startTimer();
+    saveGame();
+    return true;
   }
 
   // —— 失败结算界面 ——
@@ -1436,7 +1480,9 @@
   });
 
   // 启动
-  newGame('easy');
+  if (!loadGame()) newGame('easy');
+  window.addEventListener('beforeunload', saveGame);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveGame(); });
 })();
 </script>
 </body>
