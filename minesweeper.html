@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>扫雷</title>
+<style>
+  :root {
+    --cell: 28px;
+    --bg: #2b2f3a;
+    --panel: #1e2128;
+    --cell-covered: #4a5060;
+    --cell-covered-2: #434956;
+    --cell-open: #23262e;
+    --cell-border: #6a7180;
+    --text: #e8eaf0;
+    --text-dim: #cdd3e0;
+    --text-faint: #8b93a3;
+    --btn-bg: #353a46;
+    --btn-hover: #444a58;
+    --accent: #3d6fd6;
+    --counter-bg: #101218;
+    --bg-top: #343945;
+    --bg-bottom: #181b21;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at 50% 20%, var(--bg-top), var(--bg-bottom));
+    font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+    color: var(--text);
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  h1 {
+    margin: 0 0 12px;
+    font-weight: 500;
+    letter-spacing: 2px;
+    font-size: 22px;
+    color: var(--text-dim);
+  }
+
+  .difficulty {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .difficulty button {
+    padding: 6px 16px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    background: var(--btn-bg);
+    color: var(--text-dim);
+    transition: background .15s, transform .05s;
+  }
+
+  .difficulty button:hover { background: var(--btn-hover); }
+  .difficulty button:active { transform: translateY(1px); }
+  .difficulty button.active { background: var(--accent); color: #fff; }
+
+  .custom-panel {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    font-size: 14px;
+    color: var(--text-dim);
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .custom-panel.hidden { display: none; }
+  .custom-panel label { display: flex; align-items: center; gap: 4px; }
+  .custom-panel input {
+    width: 58px;
+    padding: 5px 6px;
+    border: none;
+    border-radius: 6px;
+    background: var(--btn-bg);
+    color: var(--text);
+    font-size: 14px;
+    text-align: center;
+  }
+  .custom-panel input:focus { outline: 2px solid var(--accent); }
+  .custom-panel button {
+    padding: 5px 14px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    background: var(--btn-bg);
+    color: var(--text-dim);
+    transition: background .15s, transform .05s;
+  }
+  .custom-panel button:hover { background: var(--btn-hover); }
+  .custom-panel button.primary { background: var(--accent); color: #fff; }
+  .custom-err { width: 100%; min-height: 16px; font-size: 13px; color: #ff5a5a; text-align: center; }
+
+  .hud {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    margin-bottom: 10px;
+    font-size: 15px;
+  }
+
+  .msg {
+    min-height: 22px;
+    margin: 0 0 10px;
+    font-size: 14px;
+    color: #ffd479;
+    text-align: center;
+    line-height: 1.6;
+  }
+
+  .counter {
+    background: var(--counter-bg);
+    color: #ff5a5a;
+    font-family: "Consolas", monospace;
+    font-weight: bold;
+    font-size: 20px;
+    padding: 4px 12px;
+    border-radius: 6px;
+    min-width: 64px;
+    text-align: center;
+    letter-spacing: 1px;
+  }
+
+  .counter.time { color: #4fd06a; }
+
+  .reset-btn {
+    width: 42px;
+    height: 42px;
+    font-size: 24px;
+    border: none;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    cursor: pointer;
+    line-height: 1;
+    transition: transform .1s;
+  }
+  .reset-btn:hover { transform: scale(1.08); }
+  .reset-btn:active { transform: scale(0.95); }
+
+  .flag-mode-btn {
+    height: 42px;
+    padding: 0 14px;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    background: var(--btn-bg);
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: background .15s, transform .05s;
+  }
+  .flag-mode-btn:hover { background: var(--btn-hover); }
+  .flag-mode-btn.active { background: #e08a2e; color: #fff; }
+
+  .hint-btn {
+    height: 42px;
+    padding: 0 14px;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    background: var(--btn-bg);
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: background .15s, transform .05s;
+  }
+  .hint-btn:hover { background: var(--btn-hover); }
+  .hint-btn:active { background: var(--accent); color: #fff; }
+
+  .cell.hint-safe { animation: hintSafe 0.9s ease-in-out infinite; }
+  .cell.hint-mine { animation: hintMine 0.9s ease-in-out infinite; }
+
+  @keyframes hintSafe {
+    0%, 100% { box-shadow: inset 0 0 0 2px #4fd06a; }
+    50%      { box-shadow: inset 0 0 0 4px #4fd06a; }
+  }
+  @keyframes hintMine {
+    0%, 100% { box-shadow: inset 0 0 0 2px #ff5a5a; }
+    50%      { box-shadow: inset 0 0 0 4px #ff5a5a; }
+  }
+
+  .board {
+    display: inline-grid;
+    gap: 1px;
+    padding: 8px;
+    background: var(--panel);
+    border-radius: 10px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.5);
+    touch-action: manipulation;
+  }
+
+  .cell {
+    width: var(--cell);
+    height: var(--cell);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 15px;
+    cursor: pointer;
+    background: var(--cell-covered);
+    border-radius: 3px;
+    transition: background .08s;
+    line-height: 1;
+  }
+
+  .cell:nth-child(odd) { background: var(--cell-covered-2); }
+
+  .cell:hover { filter: brightness(1.15); }
+
+  .cell.open {
+    background: var(--cell-open);
+    cursor: default;
+    filter: none;
+  }
+
+  .cell.open:hover { filter: none; }
+
+  .cell.flag::after { content: "🚩"; font-size: 13px; }
+
+  .cell.mine { background: #d33a3a !important; }
+  .cell.mine::after { content: "💣"; font-size: 14px; }
+  .cell.mine.hit { background: #ff2d2d !important; }
+
+  .cell.n1 { color: #4aa8ff; }
+  .cell.n2 { color: #4fd06a; }
+  .cell.n3 { color: #ff6b6b; }
+  .cell.n4 { color: #b48cff; }
+  .cell.n5 { color: #ff9d5c; }
+  .cell.n6 { color: #4fd0d0; }
+  .cell.n7 { color: #e8eaf0; }
+  .cell.n8 { color: #9aa2b1; }
+
+  .tip {
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--text-faint);
+    text-align: center;
+    line-height: 1.8;
+  }
+
+  .theme-btn {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    background: var(--btn-bg);
+    color: var(--text-dim);
+    transition: background .15s, transform .05s;
+  }
+  .theme-btn:hover { background: var(--btn-hover); }
+  .theme-btn:active { transform: translateY(1px); }
+
+  .bestline {
+    margin: 0 0 10px;
+    font-size: 13px;
+    color: var(--text-faint);
+    text-align: center;
+  }
+
+  body.light {
+    --bg: #eef1f7;
+    --panel: #d7dce8;
+    --cell-covered: #bcc4d4;
+    --cell-covered-2: #b0b9cb;
+    --cell-open: #f7f9fc;
+    --cell-border: #8a92a5;
+    --text: #2a2f3a;
+    --text-dim: #3a4150;
+    --text-faint: #6a7283;
+    --btn-bg: #d0d6e2;
+    --btn-hover: #c2c9d8;
+    --accent: #3d6fd6;
+    --counter-bg: #c9d0dd;
+    --bg-top: #f4f6fb;
+    --bg-bottom: #d9dfea;
+  }
+  body.light .cell.n7 { color: #2a2f3a; }
+  body.light .cell.n8 { color: #6a7180; }
+</style>
+</head>
+<body>
+  <h1>扫 雷</h1>
+
+  <div class="difficulty">
+    <button data-level="easy" class="active">初级 9×9</button>
+    <button data-level="medium">中级 16×16</button>
+    <button data-level="hard">高级 30×16</button>
+    <button data-level="custom" id="customBtn">自定义</button>
+    <button class="theme-btn" id="themeBtn" title="切换日间/夜间主题">☀️</button>
+  </div>
+
+  <div class="custom-panel hidden" id="customPanel">
+    <label>行 <input type="number" id="cRows" min="4" max="24" value="16"></label>
+    <label>列 <input type="number" id="cCols" min="4" max="30" value="16"></label>
+    <label>雷 <input type="number" id="cMines" min="1" value="40"></label>
+    <button class="primary" id="customStart">开始</button>
+    <button id="customCancel">取消</button>
+    <div class="custom-err" id="customErr"></div>
+  </div>
+
+  <div class="bestline" id="bestLine"></div>
+
+  <div class="hud">
+    <div class="counter" id="mineCounter">010</div>
+    <button class="reset-btn" id="resetBtn" title="重新开始">😊</button>
+    <button class="hint-btn" id="hintBtn" title="提示：标出当前可确定的格子">💡 提示</button>
+    <button class="flag-mode-btn" id="flagModeBtn" title="切换插旗模式">🚩 标记</button>
+    <div class="counter time" id="timer">000</div>
+  </div>
+
+  <div class="msg" id="msg"></div>
+
+  <div class="board" id="board"></div>
+
+  <div class="tip">
+    电脑：左键翻开 · 右键插旗 · 双击数字快速展开<br>
+    手机：点按翻开 · 长按插旗（或开启「🚩 标记」后点按插旗）<br>
+    ✨ 无猜模式：任何局面都能靠逻辑推理解开，不需要碰运气<br>
+    💡 提示：绿框=安全可点 · 红框=必是雷（请插旗）
+  </div>
+
+<script>
+(function () {
+  const LEVELS = {
+    easy:   { rows: 9,  cols: 9,  mines: 10, cell: 30 },
+    medium: { rows: 16, cols: 16, mines: 40, cell: 28 },
+    hard:   { rows: 16, cols: 30, mines: 99, cell: 26 },
+  };
+  const LEVEL_NAMES = { easy: '初级', medium: '中级', hard: '高级' };
+
+  const boardEl = document.getElementById('board');
+  const mineCounterEl = document.getElementById('mineCounter');
+  const timerEl = document.getElementById('timer');
+  const resetBtn = document.getElementById('resetBtn');
+  const flagModeBtn = document.getElementById('flagModeBtn');
+  const hintBtn = document.getElementById('hintBtn');
+  const msgEl = document.getElementById('msg');
+  const bestLineEl = document.getElementById('bestLine');
+  const themeBtn = document.getElementById('themeBtn');
+  const customBtn = document.getElementById('customBtn');
+  const customPanel = document.getElementById('customPanel');
+  const cRows = document.getElementById('cRows');
+  const cCols = document.getElementById('cCols');
+  const cMines = document.getElementById('cMines');
+  const customStart = document.getElementById('customStart');
+  const customCancel = document.getElementById('customCancel');
+  const customErr = document.getElementById('customErr');
+
+  let rows, cols, mineCount;
+  let grid = [];          // 二维数组 { mine, revealed, flagged, adjacent }
+  let flagCount = 0;
+  let revealedCount = 0;
+  let gameOver = false;
+  let firstClick = true;
+  let seconds = 0;
+  let timerId = null;
+  let flagMode = false;
+  let longPressTimer = null;
+  let lastLongPress = 0;
+  let hintTimer = null;
+  let hintCount = 0;
+  let customCfg = null;
+
+  function newGame(level) {
+    let cfg;
+    if (level === 'custom' || (customCfg && level === customCfg.key)) cfg = customCfg;
+    else cfg = LEVELS[level];
+    if (!cfg) return;
+    rows = cfg.rows;
+    cols = cfg.cols;
+    mineCount = cfg.mines;
+    document.documentElement.style.setProperty('--cell', cfg.cell + 'px');
+
+    grid = [];
+    for (let r = 0; r < rows; r++) {
+      grid[r] = [];
+      for (let c = 0; c < cols; c++) {
+        grid[r][c] = { mine: false, revealed: false, flagged: false, adjacent: 0 };
+      }
+    }
+
+    flagCount = 0;
+    revealedCount = 0;
+    gameOver = false;
+    firstClick = true;
+    stopTimer();
+    clearTimeout(hintTimer);
+    hintCount = 0;
+    msgEl.textContent = '';
+    msgEl.style.color = '#ffd479';
+    seconds = 0;
+    timerEl.textContent = '000';
+    resetBtn.textContent = '😊';
+    updateMineCounter();
+    renderBoard();
+    updateBestDisplay();
+  }
+
+  function renderBoard() {
+    boardEl.innerHTML = '';
+    boardEl.style.gridTemplateColumns = `repeat(${cols}, var(--cell))`;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.dataset.r = r;
+        cell.dataset.c = c;
+        boardEl.appendChild(cell);
+      }
+    }
+  }
+
+  function cellAt(r, c) {
+    return boardEl.querySelector(`.cell[data-r="${r}"][data-c="${c}"]`);
+  }
+
+  // 首次点击后布雷，保证点击处及其周围无雷
+  // —— 无猜扫雷：生成保证「纯逻辑可解、无需碰运气」的雷局 ——
+  function placeMinesTemp(safeR, safeC) {
+    const mines = Array.from({ length: rows }, () => new Array(cols).fill(false));
+    const candidates = [];
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (Math.abs(r - safeR) <= 1 && Math.abs(c - safeC) <= 1) continue;
+        candidates.push([r, c]);
+      }
+    }
+    // Fisher-Yates 洗牌
+    for (let i = candidates.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+    }
+    for (let k = 0; k < mineCount; k++) {
+      const [r, c] = candidates[k];
+      mines[r][c] = true;
+    }
+    return mines;
+  }
+
+  function calcAdjacent(mines) {
+    const adj = Array.from({ length: rows }, () => new Array(cols).fill(0));
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (mines[r][c]) continue;
+        let n = 0;
+        forEachNeighbor(r, c, (nr, nc) => { if (mines[nr][nc]) n++; });
+        adj[r][c] = n;
+      }
+    }
+    return adj;
+  }
+
+  function applyBoard(mines, adj) {
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        grid[r][c].mine = mines[r][c];
+        grid[r][c].adjacent = adj[r][c];
+      }
+    }
+  }
+
+  function generateSolvableBoard(safeR, safeC) {
+    const MAX_ATTEMPTS = 120;
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      const mines = placeMinesTemp(safeR, safeC);
+      const adj = calcAdjacent(mines);
+      if (isSolvableByLogic(mines, adj, safeR, safeC)) {
+        applyBoard(mines, adj);
+        return true;
+      }
+    }
+    // 极小概率降级：直接用最后一次生成的（普通模式）
+    const mines = placeMinesTemp(safeR, safeC);
+    applyBoard(mines, calcAdjacent(mines));
+    return false;
+  }
+
+  function popcount(x) {
+    x = x - ((x >> 1) & 0x55555555);
+    x = (x & 0x33333333) + ((x >> 2) & 0x33333333);
+    x = (x + (x >> 4)) & 0x0f0f0f0f;
+    return (x * 0x01010101) >> 24;
+  }
+
+  // 模拟一个只靠确定性推理的玩家，判断整盘能否不靠猜解开
+  function isSolvableByLogic(mines, adj, safeR, safeC) {
+    const revealed = Array.from({ length: rows }, () => new Array(cols).fill(false));
+    const flagged = Array.from({ length: rows }, () => new Array(cols).fill(false));
+    const nonMines = rows * cols - mineCount;
+    let revealedCount = floodRevealSim(safeR, safeC, mines, adj, revealed);
+
+    for (let step = 0; step < 20000 && revealedCount < nonMines; step++) {
+      let progressed = false;
+
+      // 基本规则：单格确定性推理，循环到收敛
+      let basic = true;
+      while (basic && revealedCount < nonMines) {
+        basic = false;
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            if (!revealed[r][c] || adj[r][c] === 0) continue;
+            let hidden = 0, flagN = 0;
+            forEachNeighbor(r, c, (nr, nc) => {
+              if (flagged[nr][nc]) flagN++;
+              else if (!revealed[nr][nc]) hidden++;
+            });
+            const need = adj[r][c] - flagN;
+            if (need === 0 && hidden > 0) {
+              // 周围剩余全安全，翻开
+              forEachNeighbor(r, c, (nr, nc) => {
+                if (!revealed[nr][nc] && !flagged[nr][nc]) {
+                  revealedCount += floodRevealSim(nr, nc, mines, adj, revealed);
+                }
+              });
+              basic = true; progressed = true;
+            } else if (need === hidden && hidden > 0) {
+              // 周围剩余全是雷，标记
+              forEachNeighbor(r, c, (nr, nc) => {
+                if (!revealed[nr][nc] && !flagged[nr][nc]) flagged[nr][nc] = true;
+              });
+              basic = true; progressed = true;
+            }
+          }
+        }
+      }
+
+      if (revealedCount >= nonMines) break;
+
+      // 组合推理：对前沿做约束求解，找必然雷 / 必然安全格
+      const csp = solveCSP(mines, adj, revealed, flagged);
+      if (!csp) return false;
+      if (csp.certainMine.length > 0) {
+        for (const [r, c] of csp.certainMine) flagged[r][c] = true;
+        progressed = true;
+      }
+      if (csp.certainSafe.length > 0) {
+        for (const [r, c] of csp.certainSafe) {
+          revealedCount += floodRevealSim(r, c, mines, adj, revealed);
+        }
+        progressed = true;
+      }
+
+      if (!progressed) return false; // 出现需要猜的局面
+    }
+
+    return revealedCount >= nonMines;
+  }
+
+  function floodRevealSim(startR, startC, mines, adj, revealed) {
+    if (revealed[startR][startC] || mines[startR][startC]) return 0;
+    let added = 0;
+    const stack = [[startR, startC]];
+    while (stack.length) {
+      const [r, c] = stack.pop();
+      if (revealed[r][c] || mines[r][c]) continue;
+      revealed[r][c] = true;
+      added++;
+      if (adj[r][c] === 0) {
+        forEachNeighbor(r, c, (nr, nc) => {
+          if (!revealed[nr][nc] && !mines[nr][nc]) stack.push([nr, nc]);
+        });
+      }
+    }
+    return added;
+  }
+
+  // 前沿约束求解：枚举所有满足约束的雷分布，找出被所有解一致确定的格子
+  function solveCSP(mines, adj, revealed, flagged) {
+    const frontier = [];
+    const idOf = new Map();
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (revealed[r][c] || flagged[r][c]) continue;
+        let has = false;
+        forEachNeighbor(r, c, (nr, nc) => { if (revealed[nr][nc]) has = true; });
+        if (has) {
+          idOf.set(r * cols + c, frontier.length);
+          frontier.push([r, c]);
+        }
+      }
+    }
+    if (frontier.length === 0) return { certainMine: [], certainSafe: [] };
+
+    const constraints = [];
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (!revealed[r][c] || adj[r][c] === 0) continue;
+        let flagN = 0;
+        const cells = [];
+        forEachNeighbor(r, c, (nr, nc) => {
+          if (flagged[nr][nc]) flagN++;
+          else if (!revealed[nr][nc]) {
+            const id = idOf.get(nr * cols + nc);
+            if (id !== undefined) cells.push(id);
+          }
+        });
+        const need = adj[r][c] - flagN;
+        if (need < 0) return null;
+        if (cells.length === 0) {
+          if (need > 0) return null;
+          continue;
+        }
+        if (need > cells.length) return null;
+        constraints.push({ cells, need });
+      }
+    }
+    if (constraints.length === 0) return { certainMine: [], certainSafe: [] };
+
+    // 连通分量分解（把相互独立的前沿区域分开各自求解）
+    const m = frontier.length;
+    const parent = Array.from({ length: m }, (_, i) => i);
+    const find = (x) => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
+    const union = (a, b) => { const ra = find(a), rb = find(b); if (ra !== rb) parent[ra] = rb; };
+    for (const con of constraints) {
+      for (let i = 1; i < con.cells.length; i++) union(con.cells[0], con.cells[i]);
+    }
+    const groups = new Map();
+    for (let i = 0; i < m; i++) {
+      const root = find(i);
+      if (!groups.has(root)) groups.set(root, []);
+      groups.get(root).push(i);
+    }
+
+    const certainMine = [];
+    const certainSafe = [];
+    for (const groupIds of groups.values()) {
+      const n = groupIds.length;
+      if (n >= 31) return null; // 分量过大，判定为需重试
+      const local = new Map();
+      groupIds.forEach((gid, idx) => local.set(gid, idx));
+      const subConstraints = [];
+      for (const con of constraints) {
+        if (local.has(con.cells[0])) {
+          let mask = 0;
+          for (const gid of con.cells) mask |= (1 << local.get(gid));
+          subConstraints.push({ mask, need: con.need });
+        }
+      }
+      const res = solveComponent(n, subConstraints);
+      if (!res) return null;
+      for (let idx = 0; idx < n; idx++) {
+        if (res.certainMine & (1 << idx)) certainMine.push(frontier[groupIds[idx]]);
+        if (res.certainSafe & (1 << idx)) certainSafe.push(frontier[groupIds[idx]]);
+      }
+    }
+
+    return { certainMine, certainSafe };
+  }
+
+  function solveComponent(n, constraints) {
+    const full = (1 << n) - 1;
+    let canBeMine = 0, canBeSafe = 0;
+    let nodes = 0;
+    const NODE_LIMIT = 200000;
+
+    const feasible = (assignment, i) => {
+      const assignedMask = (1 << i) - 1;
+      for (const c of constraints) {
+        const cur = popcount(c.mask & assignment & assignedMask);
+        if (cur > c.need) return false;
+        const remaining = popcount(c.mask & ~assignedMask);
+        if (cur + remaining < c.need) return false;
+      }
+      return true;
+    };
+
+    const dfs = (i, assignment) => {
+      if (nodes > NODE_LIMIT) return false;
+      nodes++;
+      if (i === n) {
+        canBeMine |= assignment;
+        canBeSafe |= (full & ~assignment);
+        return true;
+      }
+      for (const val of [0, 1]) {
+        const next = assignment | (val << i);
+        if (feasible(next, i + 1) && !dfs(i + 1, next)) return false;
+      }
+      return true;
+    };
+
+    if (!dfs(0, 0)) return null;
+
+    return {
+      certainMine: full & ~canBeSafe,
+      certainSafe: full & ~canBeMine,
+    };
+  }
+
+  function forEachNeighbor(r, c, fn) {
+    for (let dr = -1; dr <= 1; dr++) {
+      for (let dc = -1; dc <= 1; dc++) {
+        if (dr === 0 && dc === 0) continue;
+        const nr = r + dr, nc = c + dc;
+        if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) fn(nr, nc);
+      }
+    }
+  }
+
+  function reveal(r, c) {
+    if (gameOver) return;
+    const cell = grid[r][c];
+    if (cell.revealed || cell.flagged) return;
+
+    if (firstClick) {
+      generateSolvableBoard(r, c);
+      firstClick = false;
+      startTimer();
+    }
+
+    if (cell.mine) {
+      lose(r, c);
+      return;
+    }
+
+    // 展开（BFS）
+    const stack = [[r, c]];
+    while (stack.length) {
+      const [cr, cc] = stack.pop();
+      const cur = grid[cr][cc];
+      if (cur.revealed || cur.flagged) continue;
+      cur.revealed = true;
+      revealedCount++;
+      const el = cellAt(cr, cc);
+      el.classList.add('open');
+      if (cur.adjacent > 0) {
+        el.textContent = cur.adjacent;
+        el.classList.add('n' + cur.adjacent);
+      } else {
+        forEachNeighbor(cr, cc, (nr, nc) => {
+          if (!grid[nr][nc].revealed && !grid[nr][nc].flagged) stack.push([nr, nc]);
+        });
+      }
+    }
+
+    if (checkWin()) return;
+  }
+
+  function toggleFlag(r, c) {
+    if (gameOver) return;
+    const cell = grid[r][c];
+    if (cell.revealed) return;
+    cell.flagged = !cell.flagged;
+    flagCount += cell.flagged ? 1 : -1;
+    cellAt(r, c).classList.toggle('flag', cell.flagged);
+    updateMineCounter();
+  }
+
+  function chord(r, c) {
+    if (gameOver) return;
+    const cell = grid[r][c];
+    if (!cell.revealed || cell.adjacent === 0) return;
+    // 数周围旗子
+    let flags = 0;
+    forEachNeighbor(r, c, (nr, nc) => { if (grid[nr][nc].flagged) flags++; });
+    if (flags !== cell.adjacent) return;
+    // 翻开未标记的邻居
+    forEachNeighbor(r, c, (nr, nc) => {
+      if (!grid[nr][nc].revealed && !grid[nr][nc].flagged) reveal(nr, nc);
+    });
+  }
+
+  function lose(r, c) {
+    gameOver = true;
+    stopTimer();
+    clearTimeout(hintTimer);
+    clearHints();
+    resetBtn.textContent = '😵';
+    msgEl.textContent = '💥 踩雷了，重新开始吧';
+    msgEl.style.color = '#ff5a5a';
+    // 显示所有雷
+    for (let rr = 0; rr < rows; rr++) {
+      for (let cc = 0; cc < cols; cc++) {
+        const cell = grid[rr][cc];
+        const el = cellAt(rr, cc);
+        if (cell.mine && !cell.flagged) {
+          el.classList.add('mine');
+        } else if (cell.flagged && !cell.mine) {
+          // 插错的旗子
+          el.classList.add('open');
+          el.textContent = '❌';
+          el.style.fontSize = '12px';
+        }
+      }
+    }
+    cellAt(r, c).classList.add('hit');
+  }
+
+  function checkWin() {
+    if (revealedCount === rows * cols - mineCount) {
+      gameOver = true;
+      stopTimer();
+      clearTimeout(hintTimer);
+      clearHints();
+      resetBtn.textContent = '😎';
+      msgEl.style.color = '#4fd06a';
+      const level = currentLevel();
+      const best = loadBest();
+      const prev = best[level];
+      if (prev == null || seconds < prev) {
+        best[level] = seconds;
+        saveBest(best);
+        msgEl.textContent = `🎉 新纪录！用时 ${seconds} 秒 · 使用提示 ${hintCount} 次`;
+      } else {
+        msgEl.textContent = `🎉 通关！用时 ${seconds} 秒 · 使用提示 ${hintCount} 次 · 最快 ${prev} 秒`;
+      }
+      updateBestDisplay();
+      // 给所有雷插上旗子
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          if (grid[r][c].mine && !grid[r][c].flagged) {
+            grid[r][c].flagged = true;
+            cellAt(r, c).classList.add('flag');
+          }
+        }
+      }
+      flagCount = mineCount;
+      updateMineCounter();
+      return true;
+    }
+    return false;
+  }
+
+  function updateMineCounter() {
+    const n = mineCount - flagCount;
+    const str = String(Math.max(-99, Math.min(999, n)));
+    mineCounterEl.textContent = str.padStart(3, '0');
+    mineCounterEl.style.color = n < 0 ? '#ffb84d' : '#ff5a5a';
+  }
+
+  // —— 最快记录（按难度分别保存到本地） ——
+  function loadBest() {
+    try { return JSON.parse(localStorage.getItem('best') || '{}'); }
+    catch (e) { return {}; }
+  }
+
+  function saveBest(obj) {
+    try { localStorage.setItem('best', JSON.stringify(obj)); }
+    catch (e) {}
+  }
+
+  function updateBestDisplay() {
+    const lvl = currentLevel();
+    const label = currentLabel();
+    const b = loadBest()[lvl];
+    bestLineEl.textContent = b == null
+      ? `最快记录（${label}）：暂无`
+      : `最快记录（${label}）：${b} 秒`;
+  }
+
+  function startTimer() {
+    timerId = setInterval(() => {
+      seconds++;
+      timerEl.textContent = String(Math.min(999, seconds)).padStart(3, '0');
+    }, 1000);
+  }
+
+  function stopTimer() {
+    if (timerId) { clearInterval(timerId); timerId = null; }
+  }
+
+  // —— 提示系统：标出当前逻辑上可确定的格子 ——
+  function buildHintState() {
+    const mines = Array.from({ length: rows }, () => new Array(cols).fill(false));
+    const adj = Array.from({ length: rows }, () => new Array(cols).fill(0));
+    const revealed = Array.from({ length: rows }, () => new Array(cols).fill(false));
+    const flagged = Array.from({ length: rows }, () => new Array(cols).fill(false));
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        mines[r][c] = grid[r][c].mine;
+        adj[r][c] = grid[r][c].adjacent;
+        revealed[r][c] = grid[r][c].revealed;
+        flagged[r][c] = grid[r][c].flagged;
+      }
+    }
+    return { mines, adj, revealed, flagged };
+  }
+
+  // 逐步提示：优先单格规则（有清晰解释），找不到再组合推理
+  function findSingleHint(mines, adj, revealed, flagged) {
+    let mineHint = null;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (!revealed[r][c] || adj[r][c] === 0) continue;
+        const hidden = [];
+        let flagN = 0;
+        forEachNeighbor(r, c, (nr, nc) => {
+          if (flagged[nr][nc]) flagN++;
+          else if (!revealed[nr][nc]) hidden.push([nr, nc]);
+        });
+        const need = adj[r][c] - flagN;
+        if (need === 0 && hidden.length > 0) {
+          const [hr, hc] = hidden[0];
+          return {
+            r: hr, c: hc, type: 'safe',
+            reason: `数字「${adj[r][c]}」(${r + 1},${c + 1}) 的雷已全部标记，周围剩余空格都可放心点开`,
+          };
+        }
+        if (need === hidden.length && hidden.length > 0 && !mineHint) {
+          const [hr, hc] = hidden[0];
+          mineHint = {
+            r: hr, c: hc, type: 'mine',
+            reason: `数字「${adj[r][c]}」(${r + 1},${c + 1}) 周围还差 ${need} 颗雷，只剩 ${hidden.length} 个空格，故都是雷`,
+          };
+        }
+      }
+    }
+    return mineHint;
+  }
+
+  function findCspHint(mines, adj, revealed, flagged) {
+    const res = solveCSP(mines, adj, revealed, flagged);
+    if (!res) return null;
+    if (res.certainSafe.length > 0) {
+      const [r, c] = res.certainSafe[0];
+      return { r, c, type: 'safe', reason: `（组合推理）结合相邻多个数字的约束，可确定 (${r + 1},${c + 1}) 是安全的` };
+    }
+    if (res.certainMine.length > 0) {
+      const [r, c] = res.certainMine[0];
+      return { r, c, type: 'mine', reason: `（组合推理）结合相邻多个数字的约束，可确定 (${r + 1},${c + 1}) 是雷` };
+    }
+    return null;
+  }
+
+  function clearHints() {
+    document.querySelectorAll('.cell.hint-safe, .cell.hint-mine').forEach((el) => {
+      el.classList.remove('hint-safe', 'hint-mine');
+    });
+  }
+
+  function showHint() {
+    clearTimeout(hintTimer);
+    clearHints();
+    if (gameOver || firstClick) return;
+
+    const { mines, adj, revealed, flagged } = buildHintState();
+    let hint = findSingleHint(mines, adj, revealed, flagged);
+    if (!hint) hint = findCspHint(mines, adj, revealed, flagged);
+    if (!hint) return;
+
+    const el = cellAt(hint.r, hint.c);
+    el.classList.add(hint.type === 'safe' ? 'hint-safe' : 'hint-mine');
+    hintCount++;
+    msgEl.textContent = `💡 ${hint.reason}　（已用 ${hintCount} 次提示）`;
+    msgEl.style.color = '#ffd479';
+
+    hintTimer = setTimeout(() => {
+      clearHints();
+      msgEl.textContent = '';
+    }, 3200);
+  }
+
+  // 事件委托
+  boardEl.addEventListener('click', (e) => {
+    if (Date.now() - lastLongPress < 500) return; // 长按插旗后的合成点击，忽略
+    const cell = e.target.closest('.cell');
+    if (!cell) return;
+    if (flagMode) {
+      toggleFlag(+cell.dataset.r, +cell.dataset.c);
+    } else {
+      reveal(+cell.dataset.r, +cell.dataset.c);
+    }
+  });
+
+  // —— 手机触屏：长按插旗 ——
+  boardEl.addEventListener('touchstart', (e) => {
+    const cell = e.target.closest('.cell');
+    if (!cell) return;
+    clearTimeout(longPressTimer);
+    longPressTimer = setTimeout(() => {
+      lastLongPress = Date.now();
+      toggleFlag(+cell.dataset.r, +cell.dataset.c);
+      if (navigator.vibrate) navigator.vibrate(30);
+    }, 500);
+  }, { passive: true });
+
+  ['touchend', 'touchmove', 'touchcancel'].forEach((type) => {
+    boardEl.addEventListener(type, () => clearTimeout(longPressTimer), { passive: true });
+  });
+
+  boardEl.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    const cell = e.target.closest('.cell');
+    if (!cell) return;
+    toggleFlag(+cell.dataset.r, +cell.dataset.c);
+  });
+
+  boardEl.addEventListener('dblclick', (e) => {
+    const cell = e.target.closest('.cell');
+    if (!cell) return;
+    chord(+cell.dataset.r, +cell.dataset.c);
+  });
+
+  // 中键点击快速展开
+  boardEl.addEventListener('auxclick', (e) => {
+    if (e.button === 1) {
+      e.preventDefault();
+      const cell = e.target.closest('.cell');
+      if (cell) chord(+cell.dataset.r, +cell.dataset.c);
+    }
+  });
+
+  resetBtn.addEventListener('click', () => newGame(currentLevel()));
+
+  flagModeBtn.addEventListener('click', () => {
+    flagMode = !flagMode;
+    flagModeBtn.classList.toggle('active', flagMode);
+  });
+
+  hintBtn.addEventListener('click', showHint);
+
+  function currentLevel() {
+    const lvl = document.querySelector('.difficulty button.active').dataset.level;
+    return (lvl === 'custom' && customCfg) ? customCfg.key : lvl;
+  }
+
+  function currentLabel() {
+    const lvl = document.querySelector('.difficulty button.active').dataset.level;
+    if (lvl === 'custom') return customCfg ? `${customCfg.rows}×${customCfg.cols} · ${customCfg.mines}雷` : '自定义';
+    return LEVEL_NAMES[lvl] || lvl;
+  }
+
+  function hideCustomPanel() {
+    customPanel.classList.add('hidden');
+    customErr.textContent = '';
+  }
+  function openCustomPanel() {
+    customPanel.classList.remove('hidden');
+    customErr.textContent = '';
+  }
+  function computeCell(cols) {
+    return Math.max(20, Math.min(30, Math.floor(780 / cols)));
+  }
+  function applyCustom() {
+    const r = parseInt(cRows.value, 10);
+    const c = parseInt(cCols.value, 10);
+    const m = parseInt(cMines.value, 10);
+    const total = r * c;
+    if (!Number.isInteger(r) || r < 4 || r > 24) { customErr.textContent = '行数需为 4–24 的整数'; return; }
+    if (!Number.isInteger(c) || c < 4 || c > 30) { customErr.textContent = '列数需为 4–30 的整数'; return; }
+    if (!Number.isInteger(m) || m < 1 || m > total - 9) { customErr.textContent = `雷数需为 1–${total - 9} 的整数`; return; }
+    customCfg = {
+      key: `custom_${r}x${c}x${m}`,
+      label: `${r}×${c} · ${m}雷`,
+      rows: r, cols: c, mines: m,
+      cell: computeCell(c),
+    };
+    document.querySelectorAll('.difficulty button[data-level]').forEach(b => b.classList.remove('active'));
+    customBtn.classList.add('active');
+    hideCustomPanel();
+    newGame('custom');
+  }
+
+  customStart.addEventListener('click', applyCustom);
+  customCancel.addEventListener('click', hideCustomPanel);
+
+  document.querySelectorAll('.difficulty button[data-level]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      if (btn.dataset.level === 'custom') {
+        openCustomPanel();
+        return;
+      }
+      document.querySelectorAll('.difficulty button[data-level]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      customCfg = null;
+      hideCustomPanel();
+      newGame(btn.dataset.level);
+    });
+  });
+
+  // —— 主题切换 ——
+  function applyTheme(theme) {
+    document.body.classList.toggle('light', theme === 'light');
+    themeBtn.textContent = theme === 'light' ? '🌙' : '☀️';
+  }
+  let theme = 'dark';
+  try { theme = localStorage.getItem('theme') || 'dark'; } catch (e) {}
+  applyTheme(theme);
+  themeBtn.addEventListener('click', () => {
+    theme = theme === 'light' ? 'dark' : 'light';
+    try { localStorage.setItem('theme', theme); } catch (e) {}
+    applyTheme(theme);
+  });
+
+  // 启动
+  newGame('easy');
+})();
+</script>
+</body>
+</html>

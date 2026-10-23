@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>游戏大厅</title>
+<style>
+  :root {
+    --bg-top: #1c1c1c;
+    --bg-bottom: #040404;
+    --panel: #161616;
+    --panel-edge: #303030;
+    --card-hover: #202020;
+    --text: #d0d0d0;
+    --text-dim: #a9a9a9;
+    --text-faint: #6f6f6f;
+    --hi: #ffffff;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background:
+      radial-gradient(ellipse at 50% 40%, transparent 50%, rgba(0,0,0,.72) 100%),
+      radial-gradient(circle at 50% 0%, rgba(255,255,255,.06), transparent 55%),
+      radial-gradient(circle at 50% 25%, var(--bg-top), var(--bg-bottom));
+    font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+    color: var(--text);
+    user-select: none;
+    -webkit-user-select: none;
+    padding: 32px 16px;
+  }
+
+  h1 {
+    margin: 0 0 6px;
+    font-weight: 600;
+    letter-spacing: 10px;
+    font-size: 28px;
+    color: var(--text-dim);
+    text-shadow: 0 0 24px rgba(255,255,255,.22), 0 2px 3px rgba(0,0,0,.8);
+  }
+
+  .subtitle {
+    margin: 0 0 30px;
+    font-size: 13px;
+    color: var(--text-faint);
+    letter-spacing: 3px;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    width: 100%;
+    max-width: 640px;
+  }
+
+  .card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 26px 20px 22px;
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    border-radius: 6px;
+    text-decoration: none;
+    color: var(--text);
+    transition: transform .15s, border-color .2s, box-shadow .25s, background .2s;
+  }
+  .card:hover {
+    transform: translateY(-3px);
+    background: var(--card-hover);
+    border-color: #4a4a4a;
+    box-shadow: 0 12px 34px rgba(0,0,0,.6), 0 0 26px rgba(255,255,255,.08);
+  }
+  .card:active { transform: translateY(-1px); }
+
+  .icon {
+    width: 64px;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 34px;
+    border: 1px solid var(--panel-edge);
+    border-radius: 14px;
+    background: #0f0f0f;
+    box-shadow: inset 0 0 14px rgba(0,0,0,.7);
+    overflow: hidden;
+  }
+
+  .icon-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 14px;
+    display: block;
+  }
+
+  .card .name {
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    color: var(--hi);
+  }
+
+  .card .desc {
+    font-size: 12.5px;
+    color: var(--text-faint);
+    text-align: center;
+    line-height: 1.6;
+  }
+
+  .card .go {
+    margin-top: 2px;
+    font-size: 12px;
+    color: var(--text-faint);
+    letter-spacing: 1px;
+    opacity: 0;
+    transform: translateY(3px);
+    transition: opacity .2s, transform .2s;
+  }
+  .card:hover .go { opacity: 1; transform: translateY(0); }
+
+  .footer {
+    margin-top: 32px;
+    font-size: 12px;
+    color: var(--text-faint);
+    letter-spacing: 2px;
+  }
+
+  @media (max-width: 520px) {
+    .grid { grid-template-columns: 1fr; }
+    h1 { letter-spacing: 6px; }
+  }
+</style>
+</head>
+<body>
+  <h1>游戏大厅</h1>
+  <div class="subtitle">选择一个游戏开始</div>
+
+  <div class="grid" id="grid"></div>
+
+  <div class="footer">更多游戏陆续添加中 …</div>
+
+<script>
+// ============================================================
+//  以后添加新游戏：只需在下面 GAMES 数组里加一行即可
+//  字段：title 名称 · file 文件名(相对本目录) · icon 图标 · desc 简介
+// ============================================================
+const GAMES = [
+  {
+    title: '扫雷',
+    file: 'minesweeper.html',
+    icon: '🚩',
+    desc: '经典扫雷 · 无猜模式 · 逐步提示 · 三难度最快记录',
+  },
+  {
+    title: '日月棋',
+    file: 'riyueqi.html',
+    icon: 'data:image/jpeg;base64,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',
+    desc: '翻转石砖，点亮所有太阳 · 随机/自定义',
+  },
+  {
+    title: '2048',
+    file: 'game2048.html',
+    icon: '🔢',
+    desc: '经典数字合成 · 合并相同数字，挑战 2048',
+  },
+];
+
+const grid = document.getElementById('grid');
+
+function render() {
+  grid.innerHTML = '';
+  for (const g of GAMES) {
+    const a = document.createElement('a');
+    a.className = 'card';
+    a.href = g.file;
+
+    const icon = document.createElement('div');
+    icon.className = 'icon';
+    if (g.icon.startsWith('data:')) {
+      const img = document.createElement('img');
+      img.className = 'icon-img';
+      img.src = g.icon;
+      img.alt = g.title;
+      icon.appendChild(img);
+    } else {
+      icon.textContent = g.icon;
+    }
+
+    const name = document.createElement('div');
+    name.className = 'name';
+    name.textContent = g.title;
+
+    const desc = document.createElement('div');
+    desc.className = 'desc';
+    desc.textContent = g.desc;
+
+    const go = document.createElement('div');
+    go.className = 'go';
+    go.textContent = '进入 →';
+
+    a.appendChild(icon);
+    a.appendChild(name);
+    a.appendChild(desc);
+    a.appendChild(go);
+    grid.appendChild(a);
+  }
+}
+
+render();
+</script>
+</body>
+</html>
