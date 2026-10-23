@@ -171,9 +171,33 @@
   @media (max-width: 480px) {
     :root { --cell: 72px; --gap: 8px; }
   }
+
+  .back-home {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: 9999;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    font-size: 14px;
+    border: 1px solid rgba(255,255,255,.16);
+    border-radius: 999px;
+    background: rgba(16,16,16,.55);
+    color: #dcdcdc;
+    text-decoration: none;
+    letter-spacing: 1px;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: background .15s, transform .05s;
+  }
+  .back-home:hover { background: rgba(30,30,30,.8); }
+  .back-home:active { transform: translateY(1px); }
 </style>
 </head>
 <body>
+  <a class="back-home" href="index.html">← 返回大厅</a>
   <h1>2048</h1>
   <div class="subtitle">合并相同数字，挑战 2048</div>
 
@@ -243,6 +267,12 @@
   let won = false;
   let gameOver = false;
   let history = [];
+  let seconds = 0;
+  let timerId = null;
+  let timerStarted = false;
+  let bestTime = null;
+  let isNewBest = false;
+  let audioCtx = null;
 
   // —— 初始化背景格 ——
   function buildBg() {
@@ -295,6 +325,7 @@
     prev.value *= 2;
     score += prev.value;
     updateScore();
+    playMerge(prev.value);
     setTimeout(() => {
       if (t.el.parentNode) t.el.remove();
       prev.inner.textContent = prev.value;
@@ -369,15 +400,25 @@
     }
 
     if (moved) {
+      if (!timerStarted) startTimer();
       history.push(snap);
       if (history.length > 50) history.shift();
       updateUndoState();
       spawnTile();
       if (!won && hasValue(2048)) {
         won = true;
+        stopTimer();
+        isNewBest = false;
+        if (bestTime == null || seconds < bestTime) {
+          bestTime = seconds;
+          isNewBest = true;
+          try { localStorage.setItem('best2048_time', bestTime); } catch (e) {}
+        }
+        playWin();
         setTimeout(() => showOverlay('win'), ANIM_MS + 40);
       } else if (!canMove()) {
         gameOver = true;
+        stopTimer();
         setTimeout(() => showOverlay('gameover'), ANIM_MS + 40);
       }
     }
@@ -424,7 +465,10 @@
   function showOverlay(type) {
     if (type === 'win') {
       ovMsgEl.textContent = '你赢了！';
-      ovSubEl.textContent = '已达成 2048，继续冲击更高分？';
+      let sub = `达成 2048 · 用时 ${seconds} 秒`;
+      if (isNewBest) sub += ' · 新纪录！';
+      else if (bestTime != null) sub += ` · 最快 ${bestTime} 秒`;
+      ovSubEl.textContent = sub;
       ovPrimaryEl.textContent = '继续挑战';
     } else {
       ovMsgEl.textContent = '游戏结束';
@@ -447,6 +491,9 @@
     hideOverlay();
     history = [];
     updateUndoState();
+    stopTimer();
+    seconds = 0;
+    timerStarted = false;
     spawnTile();
     spawnTile();
   }
@@ -498,10 +545,64 @@
     applyTheme(theme);
   });
 
+  // —— 音效（Web Audio 合成） ——
+  function ensureAudio() {
+    if (!audioCtx) {
+      try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}
+    }
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+  }
+  function beep(freq, dur, type, vol, when) {
+    if (!audioCtx) return;
+    const t = when || audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type || 'sine';
+    osc.frequency.setValueAtTime(freq, t);
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.linearRampToValueAtTime(vol || 0.2, t + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(t);
+    osc.stop(t + dur + 0.02);
+  }
+  function playMerge(value) {
+    ensureAudio();
+    if (!audioCtx) return;
+    const t = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(440, t);
+    const g = audioCtx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.15, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+    osc.connect(g).connect(audioCtx.destination);
+    osc.start(t);
+    osc.stop(t + 0.12);
+  }
+  function playWin() {
+    ensureAudio();
+    if (!audioCtx) return;
+    const notes = [523.25, 659.25, 783.99, 1046.5, 1318.5];
+    notes.forEach((f, i) => beep(f, 0.28, 'triangle', 0.16, audioCtx.currentTime + i * 0.1));
+  }
+
+  // —— 计时（记录到达 2048 的时间） ——
+  function startTimer() {
+    timerStarted = true;
+    if (timerId) return;
+    timerId = setInterval(() => { seconds++; }, 1000);
+  }
+  function stopTimer() {
+    if (timerId) { clearInterval(timerId); timerId = null; }
+  }
+
   // —— 启动 ——
   buildBg();
   best = (() => { try { return +localStorage.getItem('best2048') || 0; } catch (e) { return 0; } })();
   bestEl.textContent = best;
+  bestTime = (() => { try { const v = +localStorage.getItem('best2048_time'); return v > 0 ? v : null; } catch (e) { return null; } })();
   newGame();
 })();
 </script>

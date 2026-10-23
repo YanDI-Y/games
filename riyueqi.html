@@ -313,9 +313,71 @@
   body.light .setupbar button.primary { background: var(--btn-active); color: #eee; }
   body.light .counter.moves { color: #111; }
   body.light .counter.time { color: #2a2a2a; }
+  .back-home {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: 9999;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    font-size: 14px;
+    border: 1px solid rgba(255,255,255,.16);
+    border-radius: 999px;
+    background: rgba(16,16,16,.55);
+    color: #dcdcdc;
+    text-decoration: none;
+    letter-spacing: 1px;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: background .15s, transform .05s;
+  }
+  .back-home:hover { background: rgba(30,30,30,.8); }
+  .back-home:active { transform: translateY(1px); }
+
+  .win-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,.65);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+  }
+  .win-overlay.hidden { display: none; }
+  .win-box {
+    background: var(--panel);
+    border: 1px solid #4a4a4a;
+    border-radius: 12px;
+    padding: 30px 26px;
+    text-align: center;
+    max-width: 340px;
+    width: calc(100% - 40px);
+    box-shadow: 0 16px 50px rgba(0,0,0,.7);
+  }
+  .win-symbol { font-size: 42px; margin-bottom: 10px; }
+  .win-title { font-size: 22px; font-weight: 600; color: var(--hi); letter-spacing: 2px; margin-bottom: 10px; }
+  .win-sub { font-size: 14px; color: var(--text-dim); margin-bottom: 22px; line-height: 1.7; }
+  .win-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .win-actions button {
+    padding: 9px 18px;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    cursor: pointer;
+    transition: background .15s, transform .05s;
+  }
+  .win-primary { background: var(--btn-active); color: #161616; font-weight: 600; }
+  .win-primary:hover { filter: brightness(1.1); }
+  .win-secondary { background: var(--btn-bg); color: var(--text-dim); }
+  .win-secondary:hover { background: var(--btn-hover); }
 </style>
 </head>
 <body>
+  <a class="back-home" href="index.html">← 返回大厅</a>
   <h1>日月棋</h1>
   <div class="subtitle">翻转石砖，点亮所有太阳</div>
 
@@ -350,11 +412,25 @@
     <button class="primary" id="startBtn" title="以当前局面开始游戏">▶ 开始游戏</button>
   </div>
 
+  <div class="win-overlay hidden" id="winOverlay">
+    <div class="win-box">
+      <div class="win-symbol">🚪</div>
+      <div class="win-title">谜题解开，大门开启</div>
+      <div class="win-sub" id="winSub"></div>
+      <div class="win-actions">
+        <button class="win-primary" id="winAgain">再玩一局</button>
+        <button class="win-secondary" id="winClose">关闭</button>
+      </div>
+    </div>
+  </div>
+
   <div class="tip">
     点击石砖：翻转自身与上下左右（太阳 ↔ 月亮）· 全部点亮为太阳即通关<br>
     随机＝自动生成 · 自定义＝点石砖设定太阳的位置与数量<br>
     ✦ 提示＝下一步 · ◎ 求解＝完整最优解（白色高亮框）
   </div>
+
+  <audio id="brickSfx" preload="auto" src="data:audio/mpeg;base64,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"></audio>
 
 <script>
 (function () {
@@ -526,6 +602,7 @@
       state[a] = !state[a];
       renderCell(a, true);
     }
+    playBrick();
     moves++;
     updateMoveCounter();
     if (hintMode !== 'off') updateHints();
@@ -563,6 +640,7 @@
     clearHints();
     resetBtn.textContent = '★';
     document.body.classList.add('won');
+    playWin();
 
     const prev = loadBest();
     if (prev == null || seconds < prev) {
@@ -575,6 +653,8 @@
       msgEl.textContent += ' · ✦ 完美步数！';
     }
     updateBestDisplay();
+    winSub.textContent = `用时 ${seconds} 秒 · ${moves} 步（理论最少 ${parMoves} 步）`;
+    showWinOverlay();
   }
 
   // —— 最快记录（localStorage） ——
@@ -613,6 +693,7 @@
     hintBtn.classList.remove('active');
     solveBtn.classList.remove('active');
     document.body.classList.remove('won');
+    hideWinOverlay();
     resetBtn.textContent = '⟳';
     setMsg('');
     timerEl.textContent = '000';
@@ -765,6 +846,69 @@
     try { localStorage.setItem('theme', theme); } catch (e) {}
     applyTheme(theme);
   });
+
+  // 砖块移动：播放嵌入的录音音效
+  const brickSfx = document.getElementById('brickSfx');
+  function playBrick() {
+    if (!brickSfx) return;
+    try {
+      brickSfx.currentTime = 0;
+      brickSfx.play();
+    } catch (e) {}
+  }
+
+  // —— 胜利音效（Web Audio 合成，风铃上行琶音） ——
+  let audioCtx = null;
+  function ensureAudio() {
+    if (!audioCtx) {
+      try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}
+    }
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+  }
+  function bell(freq, when, dur, vol) {
+    const t = when;
+    const o1 = audioCtx.createOscillator();
+    o1.type = 'sine';
+    o1.frequency.value = freq;
+    const g1 = audioCtx.createGain();
+    g1.gain.setValueAtTime(0.0001, t);
+    g1.gain.linearRampToValueAtTime(vol || 0.22, t + 0.012);
+    g1.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o1.connect(g1).connect(audioCtx.destination);
+    o1.start(t);
+    o1.stop(t + dur + 0.05);
+    const o2 = audioCtx.createOscillator();
+    o2.type = 'sine';
+    o2.frequency.value = freq * 2.76;
+    const g2 = audioCtx.createGain();
+    g2.gain.setValueAtTime(0.0001, t);
+    g2.gain.linearRampToValueAtTime((vol || 0.22) * 0.35, t + 0.012);
+    g2.gain.exponentialRampToValueAtTime(0.001, t + dur * 0.6);
+    o2.connect(g2).connect(audioCtx.destination);
+    o2.start(t);
+    o2.stop(t + dur + 0.05);
+  }
+  function playWin() {
+    ensureAudio();
+    if (!audioCtx) return;
+    const notes = [523.25, 659.25, 783.99, 1046.5]; // C5 E5 G5 C6
+    notes.forEach((f, i) => bell(f, audioCtx.currentTime + i * 0.12, 0.7));
+    bell(1318.5, audioCtx.currentTime + notes.length * 0.12, 0.9, 0.26); // E6 收尾
+  }
+
+  // —— 通关胜利界面 ——
+  const winOverlay = document.getElementById('winOverlay');
+  const winSub = document.getElementById('winSub');
+  const winAgain = document.getElementById('winAgain');
+  const winClose = document.getElementById('winClose');
+  function showWinOverlay() { winOverlay.classList.remove('hidden'); }
+  function hideWinOverlay() { winOverlay.classList.add('hidden'); }
+  winAgain.addEventListener('click', () => {
+    hideWinOverlay();
+    if (mode === 'random') startRandomGame();
+    else replayCustom();
+  });
+  winClose.addEventListener('click', hideWinOverlay);
 
   // 启动
   buildBoard();
